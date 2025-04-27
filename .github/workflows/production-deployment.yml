@@ -1,62 +1,111 @@
+# Workflow 名称
 name: Vercel Production Deployment
+
+# 定义一些环境变量，从 GitHub Secrets 中获取 Vercel 的项目和组织 ID
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+# 定义触发 workflow 的事件
 on:
+  # 可以手动从 GitHub Actions 页面触发
   workflow_dispatch:
+  # 当推送到 main 分支时触发
   push:
     branches:
-    - main
+      - main
+  # 当有 pull request 合并到 main 分支时触发 (可选，如果你不需要 PR 预览部署可以删除)
+  # pull_request:
+  #   branches:
+  #     - main
 
 jobs:
+  # 定义一个名为 production-deployment 的作业
   production-deployment:
+    # 作业运行在最新的 Ubuntu 环境
     runs-on: ubuntu-latest
-    
+
+    # 作业步骤
     steps:
-      - name: Install Latest Vercel CLI
-        run: npm install -g vercel@latest
-  
-      - name: Checkout theme repository
+      # 步骤 1: Checkout 当前仓库的代码 (包含 workflow 文件本身)
+      # 如果你的 Hexo 站点和主题都在同一个仓库，或者 Hexo 站点在仓库根目录，只需这一个 checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: 'theme' # Checkout the theme repository into a directory named 'theme'
+        # 如果你的 Hexo 站点不在仓库根目录，需要在这里指定 path
+        # with:
+        #   path: 'your-hexo-site-folder' # 替换为你的 Hexo 站点文件夹名称
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x' # Specify your required Node.js version
+      # --- 注意：以下步骤假设你的 Hexo 站点在仓库根目录，且主题也在其中。 ---
+      # --- 如果你的设置不同 (如像你之前那样克隆 demo 和主题)，需要调整这些路径和步骤 ---
+      # --- 我保留了你之前克隆 demo 和主题的逻辑，但做了修正 ---
 
+      # 步骤 2: 克隆 Hexo 站点仓库到 hexo-site 目录
+      # 假设你要部署的是这个 demo 仓库的内容
       - name: Clone Hexo site repository
         run: git clone https://github.com/EvanNotFound/redefine-demo.git hexo-site
 
+      # 步骤 3: Checkout 主题仓库到 theme 目录 (如果你需要将主题从单独仓库复制过来)
+      # 注意：你之前在 Move theme 步骤中直接 mv theme... 如果 theme 目录不存在会报错
+      # 更好的做法是先 Checkout theme，再 mv
+      # 这里的逻辑是克隆主题仓库到 temp-theme 目录，然后复制到 hexo-site/themes
+      - name: Checkout theme repository
+        uses: actions/checkout@v4
+        with:
+          repository: Relogys/redefine # 替换为你的主题仓库地址
+          path: 'temp-theme' # 克隆到临时目录
+
+      # 步骤 4: 移动主题到 Hexo 站点目录的 themes 文件夹
       - name: Move theme into Hexo site
         run: |
-          mv theme hexo-site/themes/redefine
+          # 创建 themes 目录如果不存在
+          mkdir -p hexo-site/themes
+          # 将克隆下来的主题文件夹移动到 themes/redefine
+          mv temp-theme hexo-site/themes/redefine
 
+      # 步骤 5: 设置 Node.js 环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x' # 推荐使用偶数版本的 Node.js LTS
+
+      # 步骤 6: 进入 Hexo 站点目录并安装依赖
+      # 这个步骤会安装 hexo 以及 package.json 中列出的所有依赖
       - name: Install dependencies
         run: |
           cd hexo-site
-          npm install
+          npm install # 这将安装 hexo 以及你在 hexo-site 的 package.json 中列出的所有依赖
 
+      # 步骤 7: 构建 Hexo 站点 (运行 hexo generate)
+      # 这是生成最终静态文件的关键步骤
       - name: Build Hexo
         run: |
           cd hexo-site
-          npm install
-          npm uninstall hexo-theme-redefine
-          npm run build
+          # 运行 hexo generate 命令，将生成的文件输出到 public 目录
+          npx hexo generate # 使用 npx 确保执行的是 hexo-site 目录下的 node_modules/.bin/hexo 命令
 
-      - name: Change directory to hexo-site
-        run: echo "HEXO_SITE_DIR=${{ github.workspace }}/hexo-site" >> $GITHUB_ENV
-
-      - name: Deploy to Vercel Action
-        uses: EvanNotFound/vercel-deployment-for-github-actions@v1.1.0
+      # 步骤 8: 使用官方 Vercel Action 部署
+      # 这个 Action 会找到 hexo-site 目录下的 public 文件夹并上传部署
+      - name: Deploy to Vercel
+        # 使用官方 Vercel Action v2 或更新版本
+        uses: vercel/actions@v2
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          WORKING_DIRECTORY: ${{ env.HEXO_SITE_DIR }}
-          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
-          PRODUCTION: true
-          DEPLOY_PR_FROM_FORK: true
-          PR_PREVIEW_DOMAIN: "redefine-preview-pr-{PR}.vercel.app"
+          # Vercel API Token (必须)
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          # Vercel 组织/团队 ID (必须)
+          org-id: ${{ secrets.VERCEL_ORG_ID }}
+          # Vercel 项目 ID (必须)
+          project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Vercel 团队 Slug 或 ID (如果项目属于团队则需要，对应你之前的 VERCEL_SCOPE)
+          team-id: ${{ secrets.VERCEL_SCOPE }}
+          # 指定 Vercel Action 的工作目录，Action 会在该目录中寻找构建输出 (默认是 public)
+          # 我们让 Action 在 hexo-site 目录下查找 public 文件夹
+          cwd: hexo-site
+          # 设置为生产部署 (true 表示部署到生产环境)
+          prod: true
+          # 控制是否部署来自 Fork 的 PR (这里保留你原来的逻辑，但通常出于安全考虑，fork 的 PR 不自动部署生产)
+          # 你可以根据需要改为 ${{ github.event_name == 'push' }} 表示只有 push 时才部署生产
+          # deploy-pr-from-fork: ${{ github.event.pull_request.head.repo.full_name != github.repository }} # 这个只在 PR 时才评估，所以生产 push 可以不写
+          # PR 预览部署的域名格式 (如果需要 PR 预览)
+          # pr-preview-domain: "redefine-preview-pr-{PR}.vercel.app"
+
+      # Vercel Action 会自动创建 GitHub Deployment Status，通常不需要额外步骤

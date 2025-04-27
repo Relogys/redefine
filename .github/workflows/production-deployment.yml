@@ -40,7 +40,7 @@ jobs:
       # 步骤 3: 克隆 Hexo 站点仓库到 hexo-site 目录
       # 假设你要部署的是这个 demo 仓库的内容
       - name: Clone Hexo site repository
-        run: git clone https://github.com/EvanNotFound/redefine-demo.git hexo-site
+        run: git clone https://github.com/Relogys/redefine-demo.git hexo-site
 
       # 步骤 4: Checkout 主题仓库到 temp-theme 目录 (如果你需要将主题从单独仓库复制过来)
       - name: Checkout theme repository

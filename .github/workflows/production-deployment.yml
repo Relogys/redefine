@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Install Latest Vercel CLI
+        run: npm install -g vercel@latest
+  
       - name: Checkout theme repository
         uses: actions/checkout@v4
         with:

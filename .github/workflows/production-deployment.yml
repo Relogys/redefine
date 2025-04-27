@@ -84,19 +84,16 @@ jobs:
           # --prod 指定为生产构建
           vercel build --prod --token=${{ secrets.VERCEL_TOKEN }} # 需要 VERCEL_TOKEN secret
 
-      # 步骤 10: 部署构建好的项目 (.vercel/output) 到 Vercel
+# 步骤 10: 部署构建好的项目 (.vercel/output) 到 Vercel
       # --prebuilt 表示部署已经构建好的 .vercel/output 文件夹
       - name: Deploy Project Artifacts to Vercel
         run: |
-          cd hexo-site # 进入站点目录执行，以便找到 .vercel/output
+          cd hexo-site # 进入站点目录执行，以便找到 .vercel/output 和由 vercel pull 生成的 .vercel 文件夹
           # --prebuilt 部署预构建的文件
           # --prod 部署到生产环境
-          # 传入 org 和 project ID
-          # 传入 scope/team ID (如果项目在团队下)
+          # token 仍然需要用于身份验证
+          # 移除 --org, --project, --scope 参数，因为 vercel pull 已经建立了链接
           vercel deploy --prebuilt --prod \
-            --token=${{ secrets.VERCEL_TOKEN }} \
-            --org=${{ env.VERCEL_ORG_ID }} \
-            --project=${{ env.VERCEL_PROJECT_ID }} \
-            --scope=${{ secrets.VERCEL_SCOPE }} # VERCEL_SCOPE 仍然从 secrets 获取
+            --token=${{ secrets.VERCEL_TOKEN }}
 
       # Vercel CLI 部署成功后，通常会自动创建 GitHub Deployment Status，无需额外步骤
